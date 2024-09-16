@@ -16,3 +16,20 @@ type UserCommonInfo struct {
 type LoginResponse struct {
 	Token string `json:"token"`
 }
+
+type MeInfo struct {
+	UserId    uint   `json:"userId"`
+	UserName  string `json:"userName"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+}
+
+type UpdateUserRequest struct {
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+}
+
+type ChangePasswordRequest struct {
+	OldPassword string `json:"oldPassword"`
+	NewPassword string `json:"newPassword"`
+}

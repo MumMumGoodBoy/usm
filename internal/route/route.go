@@ -7,9 +7,11 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/mummumgoodboy/usm/internal/auth"
 	"github.com/mummumgoodboy/usm/internal/dto"
 	"github.com/mummumgoodboy/usm/internal/model"
 	"github.com/mummumgoodboy/usm/internal/service"
+	"github.com/mummumgoodboy/verify"
 )
 
 func JsonHeaderMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -184,5 +186,185 @@ func CreateUserRoute(userService *service.UserService) {
 
 		w.WriteHeader(http.StatusOK)
 		json.NewEncoder(w).Encode(resp)
+	}))
+}
+
+func MeRoute(userService *service.UserService, verifier *verify.JWTVerifier) {
+	http.HandleFunc("GET /me", JsonHeaderMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		token, ok := auth.GetTokenHeader(r)
+		if !ok {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(dto.Error{
+				Error: "token is required in Authorization header",
+				Code:  "unauthorized",
+			})
+			return
+		}
+
+		claims, err := verifier.Verify(token)
+		if err != nil {
+			slog.Warn("error while verifying token",
+				"token", token,
+				"error", err)
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(dto.Error{
+				Error: "invalid token",
+				Code:  "unauthorized",
+			})
+			return
+		}
+
+		user, err := userService.GetUserById(claims.UserId)
+		if err != nil {
+			slog.Warn("error while fetching user",
+				"userId", claims.UserId,
+				"error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(dto.Error{
+				Error: "error while fetching user",
+				Code:  "internal_error",
+			})
+			return
+		}
+
+		resp := dto.MeInfo{
+			UserId:    user.ID,
+			UserName:  user.UserName,
+			FirstName: user.FirstName,
+			LastName:  user.LastName,
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(resp)
+	}))
+
+	http.HandleFunc("PUT /me", JsonHeaderMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		token, ok := auth.GetTokenHeader(r)
+		if !ok {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(dto.Error{
+				Error: "token is required in Authorization header",
+				Code:  "unauthorized",
+			})
+			return
+		}
+
+		claims, err := verifier.Verify(token)
+		if err != nil {
+			slog.Warn("error while verifying token",
+				"token", token,
+				"error", err)
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(dto.Error{
+				Error: "invalid token",
+				Code:  "unauthorized",
+			})
+			return
+		}
+
+		user, err := userService.GetUserById(claims.UserId)
+		if err != nil {
+			slog.Warn("error while fetching user",
+				"userId", claims.UserId,
+				"error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(dto.Error{
+				Error: "error while fetching user",
+				Code:  "internal_error",
+			})
+			return
+		}
+
+		var req dto.UpdateUserRequest
+		err = json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			slog.Warn("error while decoding request",
+				"error", err)
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(dto.Error{
+				Error: "error while decoding request",
+				Code:  "bad_input",
+			})
+			return
+		}
+
+		user.FirstName = req.FirstName
+		user.LastName = req.LastName
+
+		err = userService.UpdateUser(user)
+		if err != nil {
+			slog.Warn("error while updating user",
+				"userId", user.ID,
+				"error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(dto.Error{
+				Error: "error while updating user",
+				Code:  "internal_error",
+			})
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	http.HandleFunc("PATCH /me/password", JsonHeaderMiddleware(func(w http.ResponseWriter, r *http.Request) {
+		token, ok := auth.GetTokenHeader(r)
+		if !ok {
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(dto.Error{
+				Error: "token is required in Authorization header",
+				Code:  "unauthorized",
+			})
+			return
+		}
+
+		claims, err := verifier.Verify(token)
+		if err != nil {
+			slog.Warn("error while verifying token",
+				"token", token,
+				"error", err)
+			w.WriteHeader(http.StatusUnauthorized)
+			json.NewEncoder(w).Encode(dto.Error{
+				Error: "invalid token",
+				Code:  "unauthorized",
+			})
+			return
+		}
+
+		var req dto.ChangePasswordRequest
+		err = json.NewDecoder(r.Body).Decode(&req)
+		if err != nil {
+			slog.Warn("error while decoding request",
+				"error", err)
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(dto.Error{
+				Error: "error while decoding request",
+				Code:  "bad_input",
+			})
+			return
+		}
+
+		err = userService.ChangePassword(claims.UserId, req.OldPassword, req.NewPassword)
+		if err != nil {
+			if errors.Is(err, service.ErrWrongCredentials) {
+				w.WriteHeader(http.StatusForbidden)
+				json.NewEncoder(w).Encode(dto.Error{
+					Error: "wrong password",
+					Code:  "wrong_password",
+				})
+				return
+			}
+
+			slog.Warn("error while changing password",
+				"userId", claims.UserId,
+				"error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(dto.Error{
+				Error: "error while changing password",
+				Code:  "internal_error",
+			})
+		}
+
+		w.WriteHeader(http.StatusNoContent)
 	}))
 }

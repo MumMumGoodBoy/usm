@@ -129,3 +129,60 @@ func (u *UserService) GetUsersById(ids []uint) ([]model.User, error) {
 	}
 	return users, nil
 }
+
+func (u *UserService) GetUserById(id uint) (model.User, error) {
+	var user model.User
+	err := u.db.First(&user, id).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return model.User{}, ErrNotFound
+		}
+		return model.User{}, fmt.Errorf("error while getting user by id: %w", err)
+	}
+	return user, nil
+}
+
+func (u *UserService) UpdateUser(user model.User) error {
+	err := u.db.Save(&user).Error
+	if err != nil {
+		return fmt.Errorf("error while updating user: %w", err)
+	}
+	return nil
+}
+
+func (u *UserService) ChangePassword(userId uint, oldPassword string, newPassword string) error {
+	var user model.User
+	err := u.db.First(&user, userId).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("error while getting user by id: %w", err)
+	}
+
+	byteUserPassword, err := hex.DecodeString(user.Password)
+	if err != nil {
+		return fmt.Errorf("error while decoding password: %w", err)
+	}
+
+	err = bcrypt.CompareHashAndPassword(byteUserPassword, []byte(oldPassword))
+	if err != nil {
+		if errors.Is(err, bcrypt.ErrMismatchedHashAndPassword) {
+			return ErrWrongCredentials
+		}
+		return fmt.Errorf("error while comparing password: %w", err)
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("error while hashing password: %w", err)
+	}
+
+	user.Password = hex.EncodeToString(hashedPassword)
+	err = u.db.Save(&user).Error
+	if err != nil {
+		return fmt.Errorf("error while updating user: %w", err)
+	}
+
+	return nil
+}

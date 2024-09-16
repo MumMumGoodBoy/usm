@@ -9,6 +9,7 @@ import (
 	"github.com/mummumgoodboy/usm/internal/model"
 	"github.com/mummumgoodboy/usm/internal/route"
 	"github.com/mummumgoodboy/usm/internal/service"
+	"github.com/mummumgoodboy/verify"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -32,13 +33,22 @@ func main() {
 	// Migrate the schema
 	db.AutoMigrate(&model.User{})
 
+	privateKey := os.Getenv("JWT_PRIVATE_KEY")
+	publicKey := os.Getenv("JWT_PUBLIC_KEY")
+
 	log.Println("Database migrated")
-	userService, err := service.NewUserService(db, os.Getenv("JWT_KEY"))
+	userService, err := service.NewUserService(db, privateKey)
 	if err != nil {
 		log.Fatal("Error creating user service", err)
 	}
 
+	verifier, err := verify.NewJWTVerifier(publicKey)
+	if err != nil {
+		log.Fatal("Error creating verifier", err)
+	}
+
 	route.CreateUserRoute(userService)
+	route.MeRoute(userService, verifier)
 
 	// start the server
 	log.Println("Server started at :8080")
