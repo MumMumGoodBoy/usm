@@ -35,6 +35,7 @@ func main() {
 
 	privateKey := os.Getenv("JWT_PRIVATE_KEY")
 	publicKey := os.Getenv("JWT_PUBLIC_KEY")
+	port := os.Getenv("PORT")
 
 	log.Println("Database migrated")
 	userService, err := service.NewUserService(db, privateKey)
@@ -51,8 +52,9 @@ func main() {
 	route.MeRoute(userService, verifier)
 
 	// start the server
-	log.Println("Server started at :8080")
-	err = http.ListenAndServe(":8080", nil)
+	err = http.ListenAndServe(":"+port, nil)
+
+	log.Println("Auth server started on port", port)
 	if err != nil {
 		log.Fatal(err)
 	}
