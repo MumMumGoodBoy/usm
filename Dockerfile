@@ -1,5 +1,5 @@
 # Start with a Go base image
-FROM golang:1.23.2-bullseye AS builder
+FROM golang:1.23.2 AS builder
 
 # Set the Current Working Directory inside the container
 WORKDIR /app
