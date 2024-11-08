@@ -232,6 +232,7 @@ func MeRoute(userService *service.UserService, verifier *verify.JWTVerifier) {
 			UserName:  user.UserName,
 			FirstName: user.FirstName,
 			LastName:  user.LastName,
+			IsAdmin:   user.IsAdmin,
 		}
 
 		w.WriteHeader(http.StatusOK)

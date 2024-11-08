@@ -22,6 +22,7 @@ type MeInfo struct {
 	UserName  string `json:"userName"`
 	FirstName string `json:"firstName"`
 	LastName  string `json:"lastName"`
+	IsAdmin   bool   `json:"isAdmin"`
 }
 
 type UpdateUserRequest struct {
